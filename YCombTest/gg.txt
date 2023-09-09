@@ -1,0 +1,144 @@
+from langchain import HuggingFaceHub
+from langchain.document_loaders import UnstructuredURLLoader
+from langchain.chains.summarize import load_summarize_chain
+from langchain import PromptTemplate, LLMChain
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.chains.mapreduce import MapReduceChain
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.chains import ReduceDocumentsChain, MapReduceDocumentsChain
+from langchain.chains.combine_documents.stuff import StuffDocumentsChain
+import transformers
+import os
+import requests
+
+HUGGINGFACEHUB_API_TOKEN = ""
+os.environ["HUGGINGFACEHUB_API_TOKEN"] = HUGGINGFACEHUB_API_TOKEN
+
+def get_company_page(company_name):
+    y_combinator_url = f"https://www.ycombinator.com/companies/{company_name}"
+    loader = UnstructuredURLLoader(urls=[y_combinator_url])
+    return loader.load()
+
+
+# data -> list of document type elements
+
+data = get_company_page("meesho")
+def doc_summary(docs):
+    print (f'You have {len(docs)} document(s)')
+    
+    num_words = sum([len(doc.page_content.split(' ')) for doc in docs])
+    
+    print (f'You have roughly {num_words} words in your docs')
+    print ()
+    print (f'Preview: \n{docs[0].page_content.split(". ")[0]}')
+
+
+# MAP PROMPT TEMPLATE
+
+map_prompt_template = """Below is a section of a website about {prospect}
+
+Write a concise summary about {prospect}. If the information is not about {prospect}, exclude it from your summary.
+
+{text}
+
+% CONCISE SUMMARY:"""
+map_prompt = PromptTemplate(
+    template=map_prompt_template, input_variables=["text", "prospect"]
+)
+
+# REDUCE PROMPT TEMPLATE
+
+reduce_prompt_template = """
+Your goal is to write a personalized outbound email from {sales_rep}, a sales rep at {company} to {prospect}.
+
+A good email is personalized and combines information about the two companies on how they can help each other.
+Be sure to use value selling: A sales methodology that focuses on how your product or service will provide value to the customer instead of focusing on price or solution.
+
+% INFORMATION ABOUT {company}:
+{company_information}
+
+% INFORMATION ABOUT {prospect}:
+{text}
+
+% INCLUDE THE FOLLOWING PIECES IN YOUR RESPONSE:
+- Start the email with the sentence: "We love that {prospect} helps teams..." then insert what they help teams do.
+- The sentence: "We can help you do XYZ by ABC" Replace XYZ with what {prospect} does and ABC with what {company} does 
+- A 1-2 sentence description about {company}, be brief
+- End your email with a call-to-action such as asking them to set up time to talk more
+
+% YOUR RESPONSE:
+"""
+reduce_prompt = PromptTemplate(
+    template=reduce_prompt_template,
+    input_variables=["sales_rep", "company", "prospect", "text", "company_information"],
+)
+
+company_information = """
+* PREDOOLE ANALYTICS 
+* MISSION: Our mission is to collaborate with forward-thinking leaders and equip them with the technologies to propel their enterprises to new heights with the strategic use of Data, AI, and Automation.
+* "WoWizer Performance Monitoring: Proactively managing Qlik performance and user experience"
+* "Data Access Auditor: Validating access and managing compliance for Qlik dashboards"
+* "Bots And Ticklers: Driving BI adoption, increasing productivity, and enabling proactive action"
+* "Qlik Data Integration (QDI): Integration services for Qlik platform"
+* "Qlik Data Analytics (Qlik Sense): Analytics services utilizing Qlik Sense platform"
+* "Qlik Sense Enterprise SaaS: Qlik Sense software as a service (SaaS) solution"
+* "Qlik Services: Comprehensive services for Qlik platform"
+* "Qlik Managed Services: Managed services for Qlik platform"
+* "Qlik Health Check: Assessing and optimizing the health of Qlik deployments"
+* "Qlik Sense Optimization: Optimizing Qlik Sense performance and efficiency"
+* "Qlik Migration Services: Services for migrating from QlikView to Qlik Sense or Qlik SaaS"
+* "QlikView To Qlik Sense: Migration services from QlikView to Qlik Sense"
+* "QlikView To Qlik SaaS: Migration services from QlikView to Qlik SaaS"
+* "Qlik Sense To Qlik SaaS: Migration services from Qlik Sense to Qlik SaaS"
+* "Snowflake: Services related to Snowflake cloud data platform"
+* "Talend Data Engineering: Data engineering services utilizing Talend platform"
+* "Data Integration: Services for integrating data from various sources"
+* "Realtime Scalable Data Pipelines: Building scalable data pipelines for real-time data processing"
+* "ELT (Extract, Load, Transform): Utilizing cloud data warehousing for transformations"
+* "Data Warehouse/Lake: Cloud-based 'pay-as-you-use' data warehousing and data lakes"
+* "Business Intelligence: Services for business intelligence and reporting"
+* "Next Gen BI: Next-generation business intelligence solutions"
+* "AI/ML: Services for leveraging artificial intelligence and machine learning"
+* "No Code AI/ML: AI/ML solutions accessible to business analysts without coding"
+* "Automation: Services for intelligent process automation"
+* "Intelligent Automation: Automating enterprise processes with intelligence"
+* "Strategy & Advisory: Data strategy consulting and advisory services"
+* "Data Strategy: Creating implementable strategies for leveraging data assets"
+"""
+
+# from langchain import OpenAI
+
+# openai_api_key = ""
+
+# # Split up the texts so you don't run into token limits
+
+# text_splitter = RecursiveCharacterTextSplitter(
+#     # Set a really small chunk size, just to show.
+#     chunk_size=600,
+#     chunk_overlap=0,
+# )
+
+# docs = text_splitter.split_documents(data)
+# docs
+
+# llm = OpenAI(temperature=0.7, openai_api_key=openai_api_key)
+
+# chain = load_summarize_chain(
+#     llm,
+#     chain_type="map_reduce",
+#     map_prompt=map_prompt_template,
+#     combine_prompt=reduce_prompt_template,
+#     verbose=True,
+# )
+
+# output = chain(
+#     {
+#         "input_documents": docs,  # The seven docs that were created before
+#         "company": "PREDOOLE ANALYTICS",
+#         "company_information": company_information,
+#         "sales_rep": "sales_rep_name",
+#         "prospect": "meesho",
+#     }
+# )
+
+# print(output["output_text"])
